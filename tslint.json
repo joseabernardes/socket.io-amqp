@@ -1,0 +1,48 @@
+{
+  "defaultSeverity": "error",
+  "extends": [
+    //    "tslint:recommended"
+  ],
+  "jsRules": {},
+  "rules": {
+    "arrow-return-shorthand": true,
+    "prefer-const": true,
+    "curly": true,
+    "deprecation": {
+      "severity": "warn"
+    },
+    "semicolon": [
+      true,
+      "always"
+    ],
+    "indent": [
+      true,
+      "spaces"
+    ],
+    "member-access": false,
+    "member-ordering": [
+      true,
+      {
+        "order": [
+          "static-field",
+          "instance-field",
+          "static-method",
+          "instance-method"
+        ]
+      }
+    ],
+    "no-inferrable-types": [
+      true,
+      "ignore-params"
+    ],
+    "no-misused-new": true,
+    "no-unnecessary-initializer": true,
+    "no-use-before-declare": true,
+    "no-var-keyword": true,
+    "triple-equals": [
+      true,
+      "allow-null-check"
+    ]
+  },
+  "rulesDirectory": []
+}
