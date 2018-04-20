@@ -31,7 +31,7 @@ export class Consumer {
             this.connection = conn;
             this.openChannel();
         }, error => {
-            this.log(error, LogType.error);
+            this.log("openConnection: " + error, LogType.error);
             return this.reconnect();
         });
     }
@@ -159,7 +159,7 @@ export class Consumer {
         if (!err) {
             return false;
         }
-        this.log(err, LogType.error);
+        this.log("closeOnErr:" + err, LogType.error);
         this.connectionError = true;
         this.closeConnection(); //will reconnect
         return true;
@@ -168,9 +168,9 @@ export class Consumer {
     public closeConnection() {
         if (this.connection) {
             this.connection.close().then(value => {
-                this.log("close", LogType.log);
+                this.log("closeConnection", LogType.log);
             }, error => {
-                this.log(error, LogType.error);
+                this.log("closeConnection: " + error, LogType.error);
             });
         }
     }
