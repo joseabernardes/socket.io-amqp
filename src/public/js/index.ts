@@ -37,7 +37,7 @@ $("#list").on('click',"span.ack", function (event) {
     if (message.length != 1)
         return;
     socket.emit("ack", message.pop());
-    target.parents().eq(1).remove();
+    // target.parents().eq(1).remove();
 });
 
 // locationButton.on('click', function () {

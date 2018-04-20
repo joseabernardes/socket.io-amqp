@@ -1,5 +1,5 @@
 import {Server, Socket} from "socket.io";
-import {Consumer} from "../amqp/Consumer";
+import {Consumer, IMessage} from "../amqp/Consumer";
 import {Channel, Message} from "amqplib";
 import {Logger, LogType} from "../utils/Logger";
 
@@ -9,87 +9,53 @@ export class SocketConnection {
     private socket: Socket;
     private server: Server;
     private consumer: Consumer;
-    private channel: Channel;
-    private consumerTag: string;
     private error = false;
+    private tryOpenConsumerLimit = 10;
 
-
-    public constructor(socket: Socket, server: Server, consumer: Consumer) {
+    public constructor(socket: Socket, server: Server) {
         console.log("New User Connected " + socket.id);
         this.server = server;
         this.socket = socket;
-        this.consumer = consumer;
+        this.consumer = new Consumer("localhost", "admin", "admin", 5672); //opens connection and channel
         this.createListeners();
     }
 
 
     private createListeners() {
-        this.startConsumer();
         this.socket.on('ack', args => this.onAck(args));
-
         this.socket.on('disconnect', () => this.onDisconnect());
+        setTimeout(() => this.startConsumer(), 10);
+
     }
 
     private startConsumer() {
-        this.consumer.startNewConsumer("pt.cpv.lixo", msg => this.onMessage(msg)).then(value => {
-            this.channel = value.channel;
-            this.consumerTag = value.consumerTag;
-            this.channel.on("error", (err) => this.onError("errorChannel", err));
-            this.channel.on("close", () => this.onError("closeChannel", this.error));
-        }, reason => {
-            console.log(reason);
-        });
+        this.consumer.openConsumer("pt.cpv.lixo", 10, msg => this.onMessage(msg)).then(
+            value => {
+                console.log(value);
+            }, reason => {
+                console.log(reason);
+                if (--this.tryOpenConsumerLimit > 0) {
+                    console.log("Reopen Consumer");
+                    setTimeout(() => this.startConsumer(), 100);
+                }
+
+            });
     }
 
 
     private onDisconnect() {
         console.log("disconected", this.socket.id);
-        if (this.isChannelOpen()) {
-            this.channel.close().then(() => {
-            }, error => {
-            });
-        }
+        this.consumer.closeConnection();
     }
 
     private onAck(msg) {
-        console.log("ack ", msg);
-        if (this.isChannelOpen()) {
-            console.log("isConnected");
-            this.channel.ack(msg);
-        } else {
-            console.log("NOT CONNECTED");
-        }
+        this.consumer.ackMessage(msg);
     }
 
-    private isChannelOpen() {
-        if (this.channel) {
-            return true;
-        } else {
-            return false;
-        }
-    }
 
     private onMessage(msg: Message | null) {
         const myMsg: IMessage = {content: msg.content.toString(), fields: {deliveryTag: msg.fields.deliveryTag}};
         this.socket.emit('newMessage', myMsg);
     }
 
-    private onError(origin: string, error) {
-        if (origin === 'errorChannel') {
-            this.error = true;
-            Logger.log('[AMQP-Socket]', "Channel Error: " + error.message, LogType.error);
-        } else if (origin === 'closeChannel') {
-            Logger.log('[AMQP-Socket]', "Channel Closed", LogType.warning);
-            if (this.error) {
-                this.channel = null;
-                this.startConsumer();
-                this.error = false;
-            }
-        }
-    }
-}
-
-export interface IMessage {
-    content: string;
-    fields: { deliveryTag: number };
 }
