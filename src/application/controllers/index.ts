@@ -19,9 +19,10 @@ index.get('/', (req: Request, res: Response) => {
     });
 });
 
-index.get('/consume', (req, res) => {
+index.get('/consume/:queue', (req, res) => {
     res.render('index.hbs', {
-        pageTitle: 'Consume'
+        pageTitle: 'Consume',
+        queue: req.params.queue
     });
 });
 

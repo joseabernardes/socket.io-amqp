@@ -9,14 +9,14 @@ export class SocketConnection {
     private socket: Socket;
     private server: Server;
     private consumer: Consumer;
-    private error = false;
     private tryOpenConsumerLimit = 10;
+    private consumerTag: string;
 
-    public constructor(socket: Socket, server: Server) {
+    public constructor(socket: Socket, server: Server, consumer: Consumer) {
         console.log("New User Connected " + socket.id);
         this.server = server;
         this.socket = socket;
-        this.consumer = new Consumer("localhost", "admin", "admin", 5672); //opens connection and channel
+        this.consumer = consumer;
         this.createListeners();
     }
 
@@ -24,34 +24,38 @@ export class SocketConnection {
     private createListeners() {
         this.socket.on('ack', args => this.onAck(args));
         this.socket.on('disconnect', () => this.onDisconnect());
-        setTimeout(() => this.startConsumer(), 10);
+        this.socket.on('consume', (queue) => this.startConsumer(queue));
 
     }
 
-    private startConsumer() {
-        this.consumer.openConsumer("pt.cpv.lixo", 10, msg => this.onMessage(msg)).then(
+    private startConsumer(queue) {
+        console.log("QUEUE " + queue);
+        this.consumer.openConsumer(queue, 10, msg => this.onMessage(msg)).then(
             value => {
-                console.log(value);
+                this.consumerTag = value;
+                console.log("Consumer Start: "+value);
             }, reason => {
                 console.log(reason);
                 if (--this.tryOpenConsumerLimit > 0) {
                     console.log("Reopen Consumer");
-                    setTimeout(() => this.startConsumer(), 100);
+                    setTimeout(() => this.startConsumer(queue), 100);
                 }
 
             });
     }
 
-
     private onDisconnect() {
         console.log("disconected", this.socket.id);
-        this.consumer.closeConnection();
+        this.consumer.closeConsumer(this.consumerTag).then(value => {
+            console.log("Consumer STOP");
+        }, error => {
+            console.log("Consumer stop ERROR");
+        });
     }
 
     private onAck(msg) {
         this.consumer.ackMessage(msg);
     }
-
 
     private onMessage(msg: Message | null) {
         const myMsg: IMessage = {content: msg.content.toString(), fields: {deliveryTag: msg.fields.deliveryTag}};

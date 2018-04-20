@@ -1,13 +1,14 @@
 import * as amqp from "amqplib";
 import {Channel, Connection, Message} from "amqplib";
 import {Logger, LogType} from "../utils/Logger";
+import {Replies} from "amqplib/properties";
+import * as Promise from "bluebird";
 
 export class Consumer {
     private connection: Connection;
     private channel: Channel;
     private connectionError: boolean;
     private channelError: boolean;
-    private consumerTag: string;
 
 
     public constructor(private hostname: string, private username: string, private password: string, private port: number) {
@@ -68,16 +69,24 @@ export class Consumer {
             if (!this.isConnected()) {
                 reject("NOTCONNECTED");
             }
+            this.channel.prefetch(prefetch);
             this.channel.consume(queue, onMessage, {noAck: false}).then(
                 value => {
-                    this.consumerTag = value.consumerTag;
-                    resolve("Consumer Start");
+                    resolve(value.consumerTag);
                 },
                 error => {
                     this.closeOnErr(error);
                     reject("Consumer Error " + error);
                 });
         });
+    }
+
+    public closeConsumer(consumerTag): Promise<Replies.Empty> {
+        console.log("closeConsumer");
+        if (this.isConnected()) {
+            return this.channel.cancel(consumerTag);
+
+        }
     }
 
     public ackMessage(message): boolean {
@@ -91,56 +100,6 @@ export class Consumer {
         } catch (e) {
             return this.closeOnErr(e);
         }
-    }
-
-    /**
-     * @deprecated use openConsumer instead
-     * @param {string} queue
-     * @param {number} prefetch
-     * @param {(msg: Message) => any} onMessage
-     * @returns {Promise<string>}
-     */
-    public startNewConsumer(queue: string, prefetch: number, onMessage: (msg: Message) => any): Promise<string> {
-        return new Promise<string>((resolve, reject) => {
-            if (!this.connection) {//se nao tiver conecção, rejeita
-                reject("Not Connected");
-            }
-            this.connection.createChannel().then(ch => {
-
-                this.channel.on("error", (err) => this.onError("errorChannel", err));
-                this.channel.on("close", () => this.onError("closeChannel", null));
-                this.channel = ch;
-                ch.prefetch(prefetch);
-                this.log("Channel Created", LogType.log);
-                ch.consume(queue, onMessage, {noAck: false}).then(value => {
-                    this.consumerTag = value.consumerTag;
-                    resolve("Consumer Starts");
-                }).catch(error => {
-                    reject("Consumer Error " + error);
-                });
-                /*
-                (msg: Message) => {
-                                this.work(msg, function (ok) {
-                                    try {
-                                        if (!ok) {
-                                            ch.ack(msg);
-                                        } else {
-                                            ch.reject(msg, true);
-                                        }
-                                    } catch (e) {
-                                        this.closeOnErr(e);
-                                    }
-                                });
-
-
-                            }
-                 */
-            }).catch(error => {
-                if (this.closeOnErr(error)) {
-                    reject("Creating channel Error");
-                }
-            });
-        });
     }
 
     public isConnected(): boolean {
@@ -183,11 +142,11 @@ export class Consumer {
             }
         } else if (origin === 'close') {
             this.log("Connection Closed: " + error, LogType.warning);
-            if (this.connectionError) {
-                this.connectionError = false;
-                this.log("Reconnectiong: " + error, LogType.warning);
-                this.reconnect();
-            }
+            // if (this.connectionError) {
+            this.connectionError = false;
+            this.log("Reconnectiong: " + error, LogType.warning);
+            this.reconnect();
+            // }
         } else if (origin === 'errorChannel') {
             this.channelError = true;
             this.log("Channel Error: " + error.message, LogType.error);
@@ -199,6 +158,56 @@ export class Consumer {
                 this.reopenChannel();
             }
         }
+    }
+
+
+    /**
+     * @deprecated use openConsumer instead
+     * @param {string} queue
+     * @param {number} prefetch
+     * @param {(msg: Message) => any} onMessage
+     * @returns {Promise<string>}
+     */
+    public startNewConsumer(queue: string, prefetch: number, onMessage: (msg: Message) => any): Promise<string> {
+        return new Promise<string>((resolve, reject) => {
+            if (!this.connection) {//se nao tiver conecção, rejeita
+                reject("Not Connected");
+            }
+            this.connection.createChannel().then(ch => {
+
+                this.channel.on("error", (err) => this.onError("errorChannel", err));
+                this.channel.on("close", () => this.onError("closeChannel", null));
+                this.channel = ch;
+                ch.prefetch(prefetch);
+                this.log("Channel Created", LogType.log);
+                ch.consume(queue, onMessage, {noAck: false}).then(value => {
+                    resolve("Consumer Starts");
+                }).catch(error => {
+                    reject("Consumer Error " + error);
+                });
+                /*
+                (msg: Message) => {
+                                this.work(msg, function (ok) {
+                                    try {
+                                        if (!ok) {
+                                            ch.ack(msg);
+                                        } else {
+                                            ch.reject(msg, true);
+                                        }
+                                    } catch (e) {
+                                        this.closeOnErr(e);
+                                    }
+                                });
+
+
+                            }
+                 */
+            }).catch(error => {
+                if (this.closeOnErr(error)) {
+                    reject("Creating channel Error");
+                }
+            });
+        });
     }
 }
 

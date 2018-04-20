@@ -16,6 +16,7 @@ export class Application {
     private server: Server;
     private io: SocketIO.Server;
     private publisher: Publisher;
+    private consumer: Consumer;
 
     public constructor() {
         this.createApp();
@@ -34,6 +35,7 @@ export class Application {
         this.app.use(bodyParser.urlencoded({extended: true}));
         this.app.use(bodyParser.json());
         this.publisher = new Publisher("localhost", "admin", "admin", 5672);
+        this.consumer = new Consumer("localhost", "admin", "admin", 5672);
         this.app.set('publisher', this.publisher);
     }
 
@@ -46,7 +48,7 @@ export class Application {
 
     private sockets(): void {
         this.io = SocketIO(this.server);
-        this.io.on("connection", socket => new SocketConnection(socket, this.io));
+        this.io.on("connection", socket => new SocketConnection(socket, this.io, this.consumer));
     }
 
     private routes() {

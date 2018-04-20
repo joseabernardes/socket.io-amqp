@@ -1,6 +1,7 @@
 const socket = io();
 socket.on("connect", function () {
-    console.log("Connected to server");
+    console.log("Connected to server", $('#queue').val());
+    socket.emit("consume", $('#queue').val());
 });
 
 socket.on("disconnect", function () {
@@ -30,7 +31,7 @@ socket.on('newMessage', function (data) {
 });
 
 
-$("#list").on('click',"span.ack", function (event) {
+$("#list").on('click', "span.ack", function (event) {
     const target = $(event.target);
     const id = target.attr("data-id");
     const message = messages.filter(value => value.fields.deliveryTag == id);
