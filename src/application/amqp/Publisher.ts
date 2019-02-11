@@ -9,7 +9,7 @@ export class Publisher {
     private offlinePubQueue;
 
 
-    public constructor(private hostname: string, private username: string, private password: string, private port: number) {
+    public constructor(private url: string) {
         this.connection = null;
         this.channel = null;
         this.offlinePubQueue = [];
@@ -19,12 +19,7 @@ export class Publisher {
     // 'amqp://admin:admin@localhost'
 
     private openConnection() {
-        amqp.connect({
-            username: this.username,
-            password: this.password,
-            hostname: this.hostname,
-            port: this.port
-        }).then(conn => {
+        amqp.connect(this.url).then(conn => {
             conn.on("error", (err) => this.onError("error", err));
             conn.on("close", () => this.onError("close", null));
             this.log("Connected", LogType.log);
@@ -60,27 +55,26 @@ export class Publisher {
         });
     }
 
-    public publish(exchange: string, routingKey: string, content: string): Promise<any> {
-        return new Promise<any>(((resolve, reject) => {
-            try {
-                if (!this.isConnected()) {
-                    throw new Error("Not connected yet");
-                }
-                this.channel.publish(exchange, routingKey, new Buffer(content), {persistent: true},
-                    (err, ok) => {
-                        if (err) {
-                            throw new Error(err);
-                        } else {
-                            this.log("Message send <<" + content + ">>", LogType.log);
-                            resolve();
-                        }
-                    });
-            } catch (e) {
-                this.log("Publish Error " + e.message, LogType.error);
-                this.offlinePubQueue.push([exchange, routingKey, content]);
-                reject();
-            }
-        }));
+    public async publish(exchange: string, routingKey: string, content: string): Promise<any> {
+        try {
+            if (!this.isConnected())
+                throw new Error("Not connected yet");
+
+            await this.channel.assertQueue(routingKey, {durable: true});
+            await this.channel.bindQueue(routingKey, exchange, routingKey);
+            this.channel.publish(exchange, routingKey, new Buffer(content), {persistent: true},
+                (err, ok) => {
+                    if (err)
+                        throw new Error(err);
+                    else
+                        this.log("Message send <<" + content + ">>", LogType.log);
+                });
+
+        } catch (e) {
+            this.log("Publish Error " + e.message, LogType.error);
+            this.offlinePubQueue.push([exchange, routingKey, content]);
+            throw new Error(e);
+        }
     }
 
     public isConnected(): boolean {

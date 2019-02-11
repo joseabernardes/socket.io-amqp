@@ -34,10 +34,12 @@ export class Application {
         this.app.use(express.static(join(__dirname, '../public')));
         this.app.use(bodyParser.urlencoded({extended: true}));
         this.app.use(bodyParser.json());
-        this.publisher = new Publisher("localhost", "admin", "admin", 5672);
-        this.consumer = new Consumer("localhost", "admin", "admin", 5672);
+        this.publisher = new Publisher("amqp://admin:localhost/admin");
+        this.consumer = new Consumer("amqp://admin:localhost/admin");
         this.app.set('publisher', this.publisher);
     }
+
+
 
     private createServer() {
         this.server = createServer(this.app);
