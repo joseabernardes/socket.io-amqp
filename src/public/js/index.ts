@@ -6,7 +6,28 @@ socket.on("connect", function () {
 
 socket.on("disconnect", function () {
     console.log("Disconected from server");
+    messages = [];
+    $('#list').empty();
+
 });
+
+socket.on("acked", function (message) {
+    const span = $("span[data-id=" + message.fields.deliveryTag + "]");
+    span.parents().eq(1).remove();
+    toastr.success("Message acked");
+});
+socket.on("nacked", function (message) {
+    const span = $("span[data-id=" + message.fields.deliveryTag + "]");
+    span.parents().eq(1).remove();
+    toastr.success("Message nacked");
+});
+
+socket.on("m_error", function (message) {
+    toastr.error(message.message);
+    console.log(message);
+});
+
+
 
 let messages = [];
 
@@ -41,6 +62,15 @@ $("#list").on('click', "span.ack", function (event) {
     // target.parents().eq(1).remove();
 });
 
+$("#list").on('click', "span.nack", function (event) {
+    const target = $(event.target);
+    const id = target.attr("data-id");
+    const message = messages.filter(value => value.fields.deliveryTag == id);
+    if (message.length != 1)
+        return;
+    socket.emit("nack", message.pop());
+    // target.parents().eq(1).remove();
+});
 // locationButton.on('click', function () {
 
 
